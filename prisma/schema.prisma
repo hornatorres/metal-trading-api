@@ -1,0 +1,190 @@
+// ============================================================
+// PRISMA SCHEMA - Metal Trading Platform
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ──────────────────────────────────────────────────
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+enum TransactionType {
+  BUY
+  SELL
+  DEPOSIT
+  WITHDRAWAL
+}
+
+enum OrderStatus {
+  PENDING
+  EXECUTED
+  CANCELLED
+  FAILED
+}
+
+enum OrderType {
+  BUY
+  SELL
+}
+
+enum WithdrawalStatus {
+  PENDING
+  READY_FOR_PICKUP
+  COMPLETED
+  EXPIRED
+  CANCELLED
+}
+
+// ─── MODELS ─────────────────────────────────────────────────
+
+model User {
+  id            String      @id @default(uuid())
+  email         String      @unique
+  passwordHash  String      @map("password_hash")
+  status        UserStatus  @default(ACTIVE)
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  wallets       Wallet[]
+  transactions  Transaction[]
+  orders        Order[]
+  withdrawals   Withdrawal[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model Metal {
+  id          String   @id @default(uuid())
+  name        String   @unique // "Copper", "Aluminium"
+  symbol      String   @unique // "CU", "AL"
+  unit        String   @default("kg")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  wallets      Wallet[]
+  transactions Transaction[]
+  orders       Order[]
+  inventory    Inventory?
+  withdrawals  Withdrawal[]
+  prices       Price[]
+
+  @@map("metals")
+}
+
+model Wallet {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  metalId   String?  @map("metal_id")   // NULL = USD wallet
+  balance   Decimal  @default(0) @db.Decimal(18, 8)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User   @relation(fields: [userId], references: [id])
+  metal     Metal? @relation(fields: [metalId], references: [id])
+
+  @@unique([userId, metalId])
+  @@index([userId])
+  @@map("wallets")
+}
+
+/// LEDGER — append-only, no updates or deletes ever
+model Transaction {
+  id          String          @id @default(uuid())
+  userId      String          @map("user_id")
+  type        TransactionType
+  metalId     String?         @map("metal_id")
+  amount      Decimal         @db.Decimal(18, 8)   // kg or USD depending on type
+  price       Decimal?        @db.Decimal(18, 8)   // USD per kg
+  totalUsd    Decimal?        @map("total_usd") @db.Decimal(18, 8)
+  referenceId String?         @map("reference_id") // orderId or withdrawalId
+  metadata    Json?                                 // extra context (spread, fees, etc.)
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  user        User   @relation(fields: [userId], references: [id])
+  metal       Metal? @relation(fields: [metalId], references: [id])
+
+  @@index([userId])
+  @@index([referenceId])
+  @@index([createdAt])
+  @@map("transactions")
+}
+
+model Order {
+  id         String      @id @default(uuid())
+  userId     String      @map("user_id")
+  type       OrderType
+  metalId    String      @map("metal_id")
+  amountKg   Decimal     @map("amount_kg") @db.Decimal(18, 8)
+  price      Decimal     @db.Decimal(18, 8)   // execution price USD/kg
+  totalUsd   Decimal     @map("total_usd") @db.Decimal(18, 8)
+  status     OrderStatus @default(PENDING)
+  createdAt  DateTime    @default(now()) @map("created_at")
+  executedAt DateTime?   @map("executed_at")
+
+  user       User   @relation(fields: [userId], references: [id])
+  metal      Metal  @relation(fields: [metalId], references: [id])
+
+  @@index([userId])
+  @@index([metalId])
+  @@index([status])
+  @@map("orders")
+}
+
+model Inventory {
+  id             String   @id @default(uuid())
+  metalId        String   @unique @map("metal_id")
+  totalStock     Decimal  @map("total_stock") @db.Decimal(18, 8)
+  reservedStock  Decimal  @default(0) @map("reserved_stock") @db.Decimal(18, 8)
+  availableStock Decimal  @map("available_stock") @db.Decimal(18, 8)
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  metal          Metal @relation(fields: [metalId], references: [id])
+
+  @@map("inventory")
+}
+
+model Price {
+  id        String   @id @default(uuid())
+  metalId   String   @map("metal_id")
+  buyPrice  Decimal  @map("buy_price") @db.Decimal(18, 8)    // platform sells at this
+  sellPrice Decimal  @map("sell_price") @db.Decimal(18, 8)   // platform buys at this
+  spread    Decimal  @db.Decimal(5, 4)
+  validFrom DateTime @default(now()) @map("valid_from")
+  validTo   DateTime? @map("valid_to")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  metal     Metal @relation(fields: [metalId], references: [id])
+
+  @@index([metalId, validFrom])
+  @@map("prices")
+}
+
+model Withdrawal {
+  id          String           @id @default(uuid())
+  userId      String           @map("user_id")
+  metalId     String           @map("metal_id")
+  amountKg    Decimal          @map("amount_kg") @db.Decimal(18, 8)
+  status      WithdrawalStatus @default(PENDING)
+  pickupCode  String?          @unique @map("pickup_code")
+  expiresAt   DateTime?        @map("expires_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  user        User  @relation(fields: [userId], references: [id])
+  metal       Metal @relation(fields: [metalId], references: [id])
+
+  @@index([userId])
+  @@index([pickupCode])
+  @@map("withdrawals")
+}

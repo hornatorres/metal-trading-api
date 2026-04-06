@@ -1,0 +1,144 @@
+### ─────────────────────────────────────────────────────────────
+### Metal Trading API  —  REST Client (VS Code REST Client plugin)
+### Cambia @baseUrl y los IDs luego del seed
+### ─────────────────────────────────────────────────────────────
+
+@baseUrl = http://localhost:3000/api/v1
+
+### ══════════════════════════════════════════════════════════════
+###  USERS
+### ══════════════════════════════════════════════════════════════
+
+### 1. Crear usuario
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "trader@example.com",
+  "password": "Secure1234!"
+}
+
+### ─────────────────────────────────────────────────────────────
+
+### 2. Obtener usuario
+# @userId = <pegar userId del response anterior>
+GET {{baseUrl}}/users/{{userId}}
+
+### ══════════════════════════════════════════════════════════════
+###  WALLETS
+### ══════════════════════════════════════════════════════════════
+
+### 3. Consultar wallets del usuario
+GET {{baseUrl}}/wallets/{{userId}}
+
+### ══════════════════════════════════════════════════════════════
+###  PRICES
+### ══════════════════════════════════════════════════════════════
+
+### 4. Ver todos los precios actuales
+GET {{baseUrl}}/prices
+
+### ─────────────────────────────────────────────────────────────
+
+### 5. Ver precio por metal
+# @metalId = <copiar metalId del seed output>
+GET {{baseUrl}}/prices/{{metalId}}
+
+### ─────────────────────────────────────────────────────────────
+
+### 6. Actualizar precio (market maker)
+POST {{baseUrl}}/prices
+Content-Type: application/json
+
+{
+  "metalId": "{{metalId}}",
+  "buyPrice": 9.00,
+  "sellPrice": 8.60
+}
+
+### ══════════════════════════════════════════════════════════════
+###  INVENTORY
+### ══════════════════════════════════════════════════════════════
+
+### 7. Ver inventario completo
+GET {{baseUrl}}/inventory
+
+### ══════════════════════════════════════════════════════════════
+###  TRADING
+### ══════════════════════════════════════════════════════════════
+
+### 8. Comprar 100 kg de Copper
+POST {{baseUrl}}/buy
+Content-Type: application/json
+
+{
+  "userId":   "{{userId}}",
+  "metalId":  "{{metalId}}",
+  "amountKg": 100
+}
+
+### ─────────────────────────────────────────────────────────────
+
+### 9. Vender 25 kg de Copper
+POST {{baseUrl}}/sell
+Content-Type: application/json
+
+{
+  "userId":   "{{userId}}",
+  "metalId":  "{{metalId}}",
+  "amountKg": 25
+}
+
+### ─────────────────────────────────────────────────────────────
+
+### 10. Ver ledger de transacciones
+GET {{baseUrl}}/ledger/{{userId}}
+
+### ══════════════════════════════════════════════════════════════
+###  WITHDRAWALS
+### ══════════════════════════════════════════════════════════════
+
+### 11. Solicitar retiro físico
+POST {{baseUrl}}/withdrawals
+Content-Type: application/json
+
+{
+  "userId":   "{{userId}}",
+  "metalId":  "{{metalId}}",
+  "amountKg": 10
+}
+
+### ─────────────────────────────────────────────────────────────
+
+### 12. Confirmar entrega (operador escanea código)
+# @pickupCode = <del response del withdrawal>
+PATCH {{baseUrl}}/withdrawals/confirm/{{pickupCode}}
+
+### ─────────────────────────────────────────────────────────────
+
+### 13. Ver retiros del usuario
+GET {{baseUrl}}/withdrawals/user/{{userId}}
+
+### ══════════════════════════════════════════════════════════════
+###  ERRORES ESPERADOS
+### ══════════════════════════════════════════════════════════════
+
+### E1. Comprar sin balance USD suficiente
+POST {{baseUrl}}/buy
+Content-Type: application/json
+
+{
+  "userId":   "{{userId}}",
+  "metalId":  "{{metalId}}",
+  "amountKg": 999999
+}
+
+### E2. Vender sin tener metal
+POST {{baseUrl}}/sell
+Content-Type: application/json
+
+{
+  "userId":   "{{userId}}",
+  "metalId":  "{{metalId}}",
+  "amountKg": 99999
+}
