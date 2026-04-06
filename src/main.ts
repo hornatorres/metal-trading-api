@@ -24,7 +24,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
   app.enableCors();
 
-  const port = process.env.PORT ?? 3000;
+  const port = process.env.PORT || 3000;
   await app.listen(port);
   logger.log(`🚀 Metal Trading API running on http://localhost:${port}/api/v1`);
 }
